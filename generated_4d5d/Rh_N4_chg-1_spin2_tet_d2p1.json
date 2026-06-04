@@ -1,0 +1,5 @@
+{
+  "name": "Rh_N4_chg-1_spin2_tet_d2p1",
+  "status": "failed",
+  "reason": "corr_energy>=0"
+}

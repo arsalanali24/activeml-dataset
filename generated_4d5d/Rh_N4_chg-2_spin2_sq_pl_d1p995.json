@@ -1,0 +1,5 @@
+{
+  "name": "Rh_N4_chg-2_spin2_sq_pl_d1p995",
+  "status": "build_error",
+  "error": "Electron number 47 and spin 2 are not consistent\nNote mol.spin = 2S = Nalpha - Nbeta, not 2S+1"
+}

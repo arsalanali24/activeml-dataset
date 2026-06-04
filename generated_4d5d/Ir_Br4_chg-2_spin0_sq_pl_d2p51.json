@@ -1,0 +1,5 @@
+{
+  "name": "Ir_Br4_chg-2_spin0_sq_pl_d2p51",
+  "status": "build_error",
+  "error": "Electron number 159 and spin 0 are not consistent\nNote mol.spin = 2S = Nalpha - Nbeta, not 2S+1"
+}

@@ -1,0 +1,5 @@
+{
+  "name": "Pd_N4_chg0_spin0_tet_d2p152",
+  "status": "failed",
+  "reason": "corr_energy>=0"
+}

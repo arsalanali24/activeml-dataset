@@ -1,0 +1,5 @@
+{
+  "name": "Rh_Br6_chg-3_spin4_oct_d2p48",
+  "status": "failed",
+  "reason": "corr_energy>=0"
+}

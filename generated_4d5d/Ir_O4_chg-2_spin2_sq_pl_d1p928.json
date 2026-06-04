@@ -1,0 +1,5 @@
+{
+  "name": "Ir_O4_chg-2_spin2_sq_pl_d1p928",
+  "status": "build_error",
+  "error": "Electron number 51 and spin 2 are not consistent\nNote mol.spin = 2S = Nalpha - Nbeta, not 2S+1"
+}
