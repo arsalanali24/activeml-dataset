@@ -28,5 +28,18 @@
     0.010489755806879142
   ],
   "status": "ok",
-  "spin_contamination": 0.07881772702884149
+  "spin_contamination": 0.07881772702884149,
+  "delta_E_HS_LS": 0.0,
+  "homo_lumo_gap": 0.4317381591883107,
+  "homo_energy": 0.5198309863337509,
+  "lumo_energy": 0.9515691455220616,
+  "mp2_corr": -1.130759305512939,
+  "largest_t2": 0.0,
+  "homo_ab_gap": 0.27504435700670005,
+  "n_frac_uno_010": 29,
+  "n_frac_mp2_010": 14,
+  "mi_entropy_sum": 18.89701538053917,
+  "mi_matrix_sum": 0.0,
+  "min_sab_overlap": 0.9988124985777104,
+  "d_bandwidth": 3.8371454312482975
 }

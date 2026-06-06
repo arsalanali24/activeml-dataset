@@ -35,5 +35,18 @@
   "alpha_beta_overlap": 44.85799574724457,
   "z_eff": 13.2,
   "zeta_so_cm1": 831,
-  "metal_row": "3d"
+  "metal_row": "3d",
+  "delta_E_HS_LS": 0.0736125342118612,
+  "homo_lumo_gap": 0.33113921510857,
+  "homo_energy": 0.45409799274677715,
+  "lumo_energy": 0.7852372078553471,
+  "mp2_corr": -1.064431621127036,
+  "largest_t2": 0.0,
+  "homo_ab_gap": 0.05812275513962358,
+  "n_frac_uno_010": 29,
+  "n_frac_mp2_010": 22,
+  "mi_entropy_sum": 18.72185655696472,
+  "mi_matrix_sum": 0.0,
+  "min_sab_overlap": 0.7831319943042939,
+  "d_bandwidth": 3.2073908654869503
 }
