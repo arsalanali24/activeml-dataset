@@ -27,5 +27,13 @@
     0.011238757399455209,
     0.005973987778107949
   ],
-  "status": "ok"
+  "status": "ok",
+  "spin_contamination": 0.8270280836093491,
+  "homo_lumo_gap_eV": 5.312046362496302,
+  "mulliken_metal_charge": 0.5969629210124872,
+  "loewdin_metal_charge": 0.5969629210124872,
+  "alpha_beta_overlap": 47.17297191639065,
+  "z_eff": 13.2,
+  "zeta_so_cm1": 831,
+  "metal_row": "3d"
 }

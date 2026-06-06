@@ -27,5 +27,9 @@
     0.01052924962251814,
     0.010437543887782084
   ],
-  "status": "ok"
+  "status": "ok",
+  "z_eff": 13.2,
+  "zeta_so_cm1": 831,
+  "metal_row": "3d",
+  "spin_contamination": 0.04744554817901303
 }
