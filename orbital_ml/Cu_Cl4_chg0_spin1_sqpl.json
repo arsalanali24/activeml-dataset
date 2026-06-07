@@ -1,0 +1,1 @@
+{"name": "Cu_Cl4_chg0_spin1_sqpl", "status": "build_error", "reason": "Electron number 114 and spin 1 are not consistent\nNote mol.spin = 2S = Nalpha - Nbeta, not 2S+1"}
