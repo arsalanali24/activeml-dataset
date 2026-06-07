@@ -194,10 +194,21 @@
     -1.24501265164813e-13,
     -2.1397735223375823e-13
   ],
-  "spin_contamination": 5.6783946433824894e-09,
+  "spin_contamination": 5.678387537955132e-09,
   "z_eff": 8.14,
   "zeta_so_cm1": 121,
   "metal_row": "3d",
   "basis": "def2-svp",
-  "status": "ok"
+  "status": "ok",
+  "homo_energy": 0.176268106239168,
+  "lumo_energy": 0.42218321748562637,
+  "homo_lumo_gap": 0.24591511124645837,
+  "mp2_corr": -1.7164188780196037,
+  "largest_t2": 0.057272624882806385,
+  "delta_E_HS_LS": 0.03267116332153819,
+  "n_frac_uno_001": 36,
+  "n_frac_uno_005": 26,
+  "n_frac_uno_010": 26,
+  "n_frac_uno_020": 26,
+  "mi_entropy_sum": 17.232593357418935
 }

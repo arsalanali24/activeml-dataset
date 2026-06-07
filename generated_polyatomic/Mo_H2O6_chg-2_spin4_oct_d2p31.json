@@ -199,5 +199,16 @@
   "zeta_so_cm1": 467,
   "metal_row": "4d",
   "basis": "def2-svp",
-  "status": "ok"
+  "status": "ok",
+  "homo_energy": 0.20922891227728613,
+  "lumo_energy": 0.3325486089685725,
+  "homo_lumo_gap": 0.1233196966912864,
+  "mp2_corr": -1.7413400435358448,
+  "largest_t2": 0.04695752602390068,
+  "delta_E_HS_LS": -0.09020248765932593,
+  "n_frac_uno_001": 39,
+  "n_frac_uno_005": 32,
+  "n_frac_uno_010": 30,
+  "n_frac_uno_020": 27,
+  "mi_entropy_sum": 19.717697331513346
 }
