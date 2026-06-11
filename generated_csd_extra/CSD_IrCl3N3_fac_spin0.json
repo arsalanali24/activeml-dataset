@@ -1,0 +1,1 @@
+{"name": "CSD_IrCl3N3_fac_spin0", "status": "error", "reason": "Electron number 89 and spin 0 are not consistent\nNote mol.spin = 2S = Nalpha - Nbeta, not 2S+1", "geometry": "csd_real"}
