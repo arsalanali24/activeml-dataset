@@ -1,0 +1,344 @@
+"""
+Balanced dataset generation.
+Equal coverage: all 6 metals × 4 ligands (Cl, Br, F, I)
+× multiple spin states.
+Key fix: parity check at system definition time —
+invalid spin/charge combinations never submitted.
+Target: ~40 systems per metal per ligand = 960 total.
+"""
+import numpy as np, json, os, sys, logging
+from pyscf import gto, scf, mcscf
+
+logging.basicConfig(level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(message)s')
+log = logging.getLogger(__name__)
+
+# ── LOOKUP TABLES ─────────────────────────────────────────────
+LIG_CHARGE   = {'Cl':-1,'Br':-1,'F':-1,'I':-1}
+LIG_EQ_DIST  = {
+    'Fe':{'Cl':2.18,'Br':2.35,'F':1.85,'I':2.55},
+    'Mn':{'Cl':2.35,'Br':2.50,'F':1.98,'I':2.70},
+    'Cr':{'Cl':2.31,'Br':2.47,'F':1.94,'I':2.65},
+    'Co':{'Cl':2.26,'Br':2.42,'F':1.90,'I':2.60},
+    'Ni':{'Cl':2.21,'Br':2.37,'F':1.86,'I':2.55},
+    'Cu':{'Cl':2.26,'Br':2.42,'F':1.91,'I':2.60},
+}
+
+# d-electron count by metal and oxidation state
+D_ELECTRONS = {
+    'Fe':{1:7,2:6,3:5,4:4,5:3},
+    'Mn':{1:6,2:5,3:4,4:3,5:2,6:1},
+    'Cr':{1:5,2:4,3:3,4:2,5:1,6:0},
+    'Co':{1:8,2:7,3:6,4:5},
+    'Ni':{1:9,2:8,3:7,4:6},
+    'Cu':{1:10,2:9,3:8},
+}
+
+def get_ox_state(metal, charge, n_lig, ligand):
+    lc = LIG_CHARGE.get(ligand, 0)
+    return charge - n_lig * lc
+
+def get_max_spin(metal, ox_state):
+    """Maximum spin (2S) for this metal/oxidation state."""
+    d = D_ELECTRONS.get(metal, {}).get(ox_state, -1)
+    if d < 0: return -1
+    # Max unpaired = min(d, 10-d) for d-electrons
+    return min(d, 10-d)
+
+def parity_ok(metal, charge, n_lig, ligand, spin):
+    """Check if spin is consistent with electron count."""
+    # Estimate n_electrons from charge and atoms
+    # Metal electrons + ligand electrons
+    metal_Z = {'Fe':26,'Mn':25,'Cr':24,
+                'Co':27,'Ni':28,'Cu':29}
+    lig_Z   = {'Cl':17,'Br':35,'F':9,'I':53}
+    n_metal = metal_Z.get(metal, 26)
+    n_lig_e = lig_Z.get(ligand, 17)
+    n_elec  = n_metal + n_lig * n_lig_e - charge
+    return (n_elec % 2) == (spin % 2)
+
+def build_geometry(metal, ligand, n_lig, dist):
+    positions = {
+        4: [(dist,0,0),(-dist,0,0),(0,dist,0),(0,-dist,0)],
+        6: [(dist,0,0),(-dist,0,0),(0,dist,0),
+            (0,-dist,0),(0,0,dist),(0,0,-dist)]
+    }
+    atom_str = f"{metal}  0.000  0.000  0.000\n"
+    for p in positions[n_lig]:
+        atom_str += (f"{ligand}  {p[0]:.3f}  "
+                     f"{p[1]:.3f}  {p[2]:.3f}\n")
+    return atom_str
+
+def get_active_electrons(n_total):
+    for n_act in [10,9,11,8,12,7,13,6,14]:
+        if (n_total-n_act)>=0 and (n_total-n_act)%2==0:
+            return n_act
+    raise ValueError(f"No valid n_active for {n_total}")
+
+def run_hf(mol):
+    for s in [
+        dict(max_cycle=300,conv_tol=1e-10,
+             damp=0.0,level_shift=0.0),
+        dict(max_cycle=500,conv_tol=1e-9,
+             damp=0.3,level_shift=0.0),
+        dict(max_cycle=500,conv_tol=1e-8,
+             damp=0.5,level_shift=0.2),
+        dict(max_cycle=800,conv_tol=1e-7,
+             damp=0.3,level_shift=0.5),
+    ]:
+        mf = scf.UHF(mol)
+        for k,v in s.items(): setattr(mf,k,v)
+        mf.verbose=0; mf.run()
+        if mf.converged: return mf
+    return mf
+
+def run_casscf(mf, mol, n_act):
+    homo_idx = int(
+        mf.mo_occ[0].sum()+mf.mo_occ[1].sum())//2-1
+    center = homo_idx
+    windows = [
+        list(range(max(0,center-5),center+5)),
+        list(range(max(0,center-4),center+6)),
+        list(range(max(0,center-6),center+4)),
+        list(range(max(0,center-3),center+7)),
+        list(range(max(0,center-7),center+3)),
+    ]
+    best_mc=None; best_ecorr=0.0
+    for window in windows:
+        if len(window)<10: continue
+        for shift in [1e-3,1e-2,5e-2,1e-1]:
+            try:
+                mc=mcscf.CASSCF(mf,10,n_act)
+                mc.max_cycle_macro=500
+                mc.conv_tol=1e-8
+                mc.ah_level_shift=shift
+                mc.verbose=0
+                mc.kernel(mc.sort_mo(window[:10],base=0))
+                ecorr=mc.e_tot-mf.e_tot
+                if ecorr<0 and ecorr<best_ecorr:
+                    best_mc=mc; best_ecorr=ecorr
+                if mc.converged and ecorr<-0.01:
+                    return mc,True
+            except: continue
+    if best_mc: return best_mc,best_mc.converged
+    return None,False
+
+def run_one(metal, charge, n_lig, ligand, dist, spin):
+    mult    = spin+1
+    name    = (f"{metal}_{ligand}{n_lig}"
+               f"_chg{charge}_spin{spin}")
+    outdir  = os.path.expanduser(
+        "~/activeml/data/generated300")
+    os.makedirs(outdir, exist_ok=True)
+    outfile = os.path.join(outdir, f"{name}.json")
+
+    if os.path.exists(outfile):
+        with open(outfile) as f:
+            r = json.load(f)
+        if (r.get('converged') and
+                r.get('corr_energy',0) < -0.001):
+            log.info(f"SKIP: {name}"); return True
+
+    log.info(f"Starting: {name}  mult={mult}")
+    try:
+        mol = gto.Mole()
+        mol.atom    = build_geometry(
+            metal, ligand, n_lig, dist)
+        mol.basis   = 'def2-SVP'
+        mol.charge  = charge
+        mol.spin    = spin
+        mol.verbose = 0
+        mol.build()
+
+        n_act = get_active_electrons(mol.nelectron)
+        mf    = run_hf(mol)
+        mc, converged = run_casscf(mf, mol, n_act)
+
+        if mc is None:
+            json.dump({'name':name,'status':'failed',
+                       'ligand':ligand},
+                      open(outfile,'w'))
+            return False
+
+        ecorr = mc.e_tot - mf.e_tot
+        if ecorr >= 0:
+            json.dump({'name':name,'status':'unphysical',
+                       'corr_energy':float(ecorr),
+                       'ligand':ligand},
+                      open(outfile,'w'))
+            return False
+
+        casdm1 = mc.fcisolver.make_rdm1(
+            mc.ci, mc.ncas, mc.nelecas)
+        no_occ,_ = np.linalg.eigh(casdm1)
+        no_occ   = np.sort(no_occ)[::-1]
+        n_active = sum(1 for n in no_occ
+                       if 0.02 < n < 1.98)
+
+        with open(outfile,'w') as f:
+            json.dump({
+                "name"        : name,
+                "metal"       : metal,
+                "ligand"      : ligand,
+                "n_ligands"   : n_lig,
+                "charge"      : charge,
+                "spin"        : spin,
+                "mult"        : mult,
+                "dist_ang"    : dist,
+                "n_electrons" : mol.nelectron,
+                "n_active_e"  : n_act,
+                "E_HF"        : float(mf.e_tot),
+                "E_CASSCF"    : float(mc.e_tot),
+                "corr_energy" : float(ecorr),
+                "converged"   : bool(converged),
+                "n_active"    : n_active,
+                "no_occ"      : [float(n) for n in no_occ],
+                "status"      : "ok",
+            }, f, indent=2)
+        log.info(f"  Saved: active={n_active} "
+                 f"Ecorr={ecorr:.4f}")
+        return True
+
+    except Exception as e:
+        log.error(f"  Error: {e}")
+        json.dump({'name':name,'status':'error',
+                   'reason':str(e),'ligand':ligand},
+                  open(outfile,'w'))
+        return False
+
+# ── BALANCED SYSTEM GENERATION ────────────────────────────────
+# For each metal × ligand combination:
+#   - Try multiple charges (oxidation states)
+#   - For each charge: find ALL valid spin states
+#     (parity checked, physically meaningful)
+#   - Multiple bond lengths per system
+
+def get_valid_spins(metal, charge, n_lig, ligand):
+    """Return all spin values that pass parity check
+    and are physically reasonable for this system."""
+    ox = get_ox_state(metal, charge, n_lig, ligand)
+    max_s = get_max_spin(metal, ox)
+    if max_s < 0:
+        return []
+
+    valid = []
+    # Test spin values from 0 to max_s
+    for spin in range(0, max_s+1):
+        if parity_ok(metal, charge, n_lig, ligand, spin):
+            valid.append(spin)
+    return valid
+
+def make_systems(metal, ligand, charges, n_ligs,
+                 n_dist=3):
+    """Generate systems for one metal-ligand combination
+    with parity checking built in."""
+    systems = []
+    eq_dist = LIG_EQ_DIST.get(metal,{}).get(ligand, 2.20)
+
+    # Bond length fractions
+    if n_dist == 3:
+        fracs = [0.95, 1.00, 1.05]
+    elif n_dist == 2:
+        fracs = [0.95, 1.05]
+    else:
+        fracs = [1.00]
+
+    for charge in charges:
+        for n_lig in n_ligs:
+            spins = get_valid_spins(
+                metal, charge, n_lig, ligand)
+            if not spins:
+                continue
+            for frac in fracs:
+                dist = round(eq_dist * frac, 3)
+                systems.append(
+                    (metal, charge, n_lig, ligand,
+                     dist, spins))
+    return systems
+
+# ── BUILD SYSTEMS LIST ─────────────────────────────────────────
+# Target: ~40 valid jobs per metal per ligand
+# Strategy: 4 charges × 2 geometries × 3 bond lengths
+#           × ~2 spin states = ~48 jobs per metal per ligand
+
+RAW_SYSTEMS = []
+
+for ligand in ['Cl', 'Br', 'F', 'I']:
+    # ── IRON ────────────────────────────────────────────
+    RAW_SYSTEMS += make_systems('Fe', ligand,
+        charges=[-1,-2,-3,-4,-5],
+        n_ligs=[4,6], n_dist=3)
+
+    # ── MANGANESE ───────────────────────────────────────
+    RAW_SYSTEMS += make_systems('Mn', ligand,
+        charges=[-1,-2,-3,-4,-5],
+        n_ligs=[4,6], n_dist=3)
+
+    # ── CHROMIUM ────────────────────────────────────────
+    RAW_SYSTEMS += make_systems('Cr', ligand,
+        charges=[-1,-2,-3,-4,-5],
+        n_ligs=[4,6], n_dist=3)
+
+    # ── COBALT ──────────────────────────────────────────
+    RAW_SYSTEMS += make_systems('Co', ligand,
+        charges=[-1,-2,-3,-4,-5],
+        n_ligs=[4,6], n_dist=3)
+
+    # ── NICKEL ──────────────────────────────────────────
+    RAW_SYSTEMS += make_systems('Ni', ligand,
+        charges=[-1,-2,-3,-4,-5],
+        n_ligs=[4,6], n_dist=3)
+
+    # ── COPPER (d9, always doublet) ──────────────────────
+    # More charges to compensate for single spin state
+    RAW_SYSTEMS += make_systems('Cu', ligand,
+        charges=[-1,-2,-3,-4,-5,-6,0,1],
+        n_ligs=[4,6], n_dist=3)
+
+# ── EXPAND TO INDIVIDUAL JOBS ──────────────────────────────────
+ALL_JOBS = []
+seen     = set()
+
+for metal,charge,n_lig,ligand,dist,spins in RAW_SYSTEMS:
+    for spin in spins:
+        key = (metal, ligand, charge, n_lig,
+               dist, spin)
+        if key in seen:
+            continue
+        seen.add(key)
+        ALL_JOBS.append(
+            (metal, charge, n_lig, ligand, dist, spin))
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == 'summary':
+        # Print summary without running
+        from collections import defaultdict
+        by_metal  = defaultdict(int)
+        by_ligand = defaultdict(int)
+        by_ml     = defaultdict(int)
+        total = len(ALL_JOBS)
+        for m,c,n,l,d,s in ALL_JOBS:
+            by_metal[m]  += 1
+            by_ligand[l] += 1
+            by_ml[(m,l)] += 1
+        print(f"Total jobs: {total}")
+        print(f"\nBy metal:")
+        for k,v in sorted(by_metal.items()):
+            print(f"  {k}: {v}")
+        print(f"\nBy ligand:")
+        for k,v in sorted(by_ligand.items()):
+            print(f"  {k}: {v}")
+        print(f"\nBy metal × ligand:")
+        for m in ['Fe','Mn','Cr','Co','Ni','Cu']:
+            row = [f"{by_ml[(m,l)]:3d}"
+                   for l in ['Cl','Br','F','I']]
+            print(f"  {m}: Cl={row[0]} Br={row[1]} "
+                  f"F={row[2]} I={row[3]}")
+        sys.exit(0)
+
+    job_idx = int(sys.argv[1]) if len(sys.argv)>1 else 0
+    total   = len(ALL_JOBS)
+    print(f"Total jobs: {total}")
+    if job_idx >= total: sys.exit(1)
+    success = run_one(*ALL_JOBS[job_idx])
+    sys.exit(0 if success else 1)
