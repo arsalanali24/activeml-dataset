@@ -1,0 +1,12 @@
+{
+  "d0_oxo": "metals Os/Re/W/Mo/Cr/Mn/V/Ti with O/F ligand, spin=0 \u2192 n_active=0",
+  "d10_Zn": "Zn spin=0 \u2192 n_active=0",
+  "d10_Pd0": "Pd/Pt neutral d10, spin=0 \u2192 n_active<=2",
+  "HS_Mn_d5": "Mn spin=5 \u2192 n_active=5",
+  "HS_Fe_d5": "Fe spin=5 \u2192 n_active=5",
+  "LS_4d_d6": "Ru/Os spin=0 oct with N/Cl \u2192 n_active=6",
+  "CO_piback": "CO ligand spin=0 \u2192 n_active<=4",
+  "d8_CO_vaska": "Ir/Rh spin=0 with CO \u2192 n_active=2",
+  "d8_sqpl": "Ir/Rh spin=0 sq_pl with P \u2192 n_active<=4",
+  "Fe_d6_6N": "Fe spin=0 with 6+ N donors \u2192 n_active=10"
+}
